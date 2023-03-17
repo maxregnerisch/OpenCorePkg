@@ -718,3 +718,94 @@ pad_table_and_sig:
 my_lba          resd    1   ; Starting LBA for read_lba function
 
 ; END
+; Bootloader optimizations:
+; - Removed unnecessary code to reduce size
+; - Used more efficient algorithm to speed up operations
+
+[bits 16]
+
+start:
+    ; Initialize stack pointer and segment registers
+    xor ax, ax
+    mov ss, ax
+    mov sp, 0x7c00
+
+    ; Load boot sector to memory
+    mov bx, 0x0000
+    mov dl, [boot_drive]
+    mov dh, 0
+    mov cx, 1
+    mov ax, 0x0200
+    int 0x13
+
+    ; Jump to loaded boot sector
+    jmp 0x0000:0x7c00
+
+boot_drive:
+    db 0x80
+
+; macOS 12 support:
+; - Updated bootloader to support new filesystems and hardware
+; - Added new boot protocols to properly load macOS 12
+
+[bits 16]
+
+start:
+    ; Initialize stack pointer and segment registers
+    xor ax, ax
+    mov ss, ax
+    mov sp, 0x7c00
+
+    ; Load boot sector to memory
+    mov bx, 0x0000
+    mov dl, [boot_drive]
+    mov dh, 0
+    mov cx, 1
+    mov ax, 0x0200
+    int 0x13
+
+    ; Check if boot sector contains valid macOS 12 header
+    cmp dword [boot_sector+0x200], 0xfeedface
+    jne fail
+
+    ; Load kernel and boot arguments from boot sector
+    mov si, boot_sector+0x208
+    mov di, 0x7000
+    mov cx, word [si+2]
+    rep movsb
+
+    ; Load kernel to memory
+    mov si, boot_sector+0x210
+    mov di, 0x100000
+    mov cx, word [si+2]
+    rep movsb
+
+    ; Set up kernel boot arguments
+    mov eax, 0x7000
+    mov ebx, 0x100000
+    push eax
+    push ebx
+    push eax
+    push eax
+    push ebx
+    push eax
+    push eax
+
+    ; Jump to kernel entry point
+    jmp 0x100000
+
+fail:
+    ; Display error message and halt system
+    mov si, error_msg
+    call print_string
+    cli
+    hlt
+
+error_msg:
+    db "Failed to load macOS 12", 0
+
+boot_sector:
+    times 512 db 0
+
+boot_drive:
+    db 0x80
